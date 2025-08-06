@@ -28,6 +28,28 @@ class SelectEntity {
         await pool.query(command, unit.id, unit.unit_type, unit.current_health, unit.map_pos, unit.owned_by);
     }
 
+    // Creates instance of given unit type in units_state
+    // Should be called when new unit is bought
+    // unit: A JSON containing data on given unit type, obtained from unit_data by getNewUnit
+    async initiateUnit(unit, pos, player) {
+        let command =  `INSERT INTO units_state(unit_type, current_health, map_pos, owned_by) VALUES ($1, $2, $3, $4)`;
+        await pool.query(command, unit.id, unit.health, pos, player);
+    }
+
+    // Updates unit health in units_state
+    // Should be called when unit takes damage
+    async updateUnitHealth(id, health) {
+        let command = `UPDATE units_state SET current_health = $1 WHERE id = $2`;
+        await pool.query(command, health, id);
+    }
+
+    // Updates unit map position in units_state
+    // Should be called when unit moves
+    async updateUnitPos(id, pos) {
+        let command = `UPDATE units_state SET map_pos = $1 WHERE id = $2`;
+        await pool.query(command, pos, id);
+    }
+
     // Deletes the unit from the units_state table
     // Should be called when the unit is defeated
     // unit: A JSON containing: id, unit_type, current_health, map_pos, owned_by
