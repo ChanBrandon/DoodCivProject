@@ -2,7 +2,7 @@ let { Pool } = require("pg");
 let env = require("../../env.json");
 let pool = new Pool(env);
 
-class selectEntity {
+class SelectEntity {
     constructor(pool) {
         this.pool = pool;
 
@@ -15,9 +15,9 @@ class selectEntity {
     async getNewUnit(unitName) {
         // Example use: select name from units_data where name='scout';
         // let command = `SELECT name FROM units_data WHERE name='${unitType}'`;
-        let command = `SELECT name FROM units_data WHERE name=VALUES($1)`;
-        let unit = await pool.query(command, unitName);
-        return unit;
+        let command = `SELECT * FROM units_data WHERE name = $1`;
+        let unit = await pool.query(command, [unitName]);
+        return unit.rows[0];
     }
 
     // Inserts the current state of the unit into the units_state table
@@ -32,7 +32,7 @@ class selectEntity {
     // Should be called when the unit is defeated
     // unit: A JSON containing: id, unit_type, current_health, map_pos, owned_by
     async removeUnit(unit) {
-        let command = `DELETE FROM units_state WHERE id=VALUES($1)`;
+        let command = `DELETE FROM units_state WHERE id = $1`;
         await pool.query(command, unit.id);
     }
 
@@ -41,7 +41,7 @@ class selectEntity {
     // structName: the name of the structure 
     // Returns the structure retrieved
     async getNewStruct(structName) {
-        let command = `SELECT name FROM structures_data WHERE name=VALUES($1)`;
+        let command = `SELECT name FROM structures_data WHERE name = $1`;
         let struct = await pool.query(command, structName)
         return struct;
     }
@@ -58,10 +58,12 @@ class selectEntity {
     // Should be called when the structure is defeated
     // unit: A JSON containing: id, structure_type, current_health, map_pos, owned_by
     async removeUnit(struct) {
-        let command = `DELETE FROM structures_state WHERE id=VALUES($1)`;
+        let command = `DELETE FROM structures_state WHERE id = $1`;
         await pool.query(command, struct.id);
     }
 
 
 }
+
+module.exports = SelectEntity;
 
