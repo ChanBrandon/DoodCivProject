@@ -33,7 +33,7 @@ class SelectEntity {
     // unit: A JSON containing data on given unit type, obtained from unit_data by getNewUnit
     async initiateUnit(unit, pos, player) {
         let command =  `INSERT INTO units_state(unit_type, current_health, map_pos, owned_by) VALUES ($1, $2, $3, $4)`;
-        await pool.query(command, unit.id, unit.health, pos, player);
+        await pool.query(command, [unit.name, unit.health, pos, player]);
     }
 
     // Updates unit health in units_state
