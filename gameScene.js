@@ -12,12 +12,18 @@ export class GameScene extends Phaser.Scene {
     this.endTurnBtn = null;
   }
 
+  init(data) {
+    this.level = data.level;
+  }
+
   preload() {
     this.load.json("level1", "assets/levels/level1.json");
+    this.load.json("level2", "assets/levels/level2.json");
+    this.load.json("level3", "assets/levels/level3.json");
   }
 
   create() {
-    const levelData = this.cache.json.get("level1");
+    const levelData = this.cache.json.get(this.level);
 
     this.tiles = [];
     const radius = 30;
@@ -97,7 +103,7 @@ export class GameScene extends Phaser.Scene {
 
   renderTurnHud() {
     this.turnText.setText(
-      " Round: ${this.round}\nCurrent: ${this.currentPlayer()}\nNext: ${this.nextPlayer()}",
+      `Round: ${this.round}\nCurrent: ${this.currentPlayer()}\nNext: ${this.nextPlayer()}`,
     );
   }
 }

@@ -110,28 +110,17 @@ export class Menu extends Phaser.Scene {
       align: "center",
     });
 
-    let viewLevel1Button = this.add.text(-500, centerY + 275, "View Level 1", { //We can delete this later
-      fontFamily: '"JetBrains Mono", monospace',
-      fontSize: "32px",
-      color: "#ffffff",
-      backgroundColor: "#333333",
-      padding: { x: 20, y: 10 },
-      align: "center",
-    });
-
     title.setOrigin(0.5);
     subTitle.setOrigin(0.5);
     playButton.setOrigin(0.5);
     tutorialButton.setOrigin(0.5);
     createMapButton.setOrigin(0.5);
-    viewLevel1Button.setOrigin(0.5);
 
     this.menu.add(title);
     this.menu.add(subTitle);
     this.menu.add(playButton);
     this.menu.add(tutorialButton);
     this.menu.add(createMapButton);
-    this.menu.add(viewLevel1Button);
 
     this.tweens.add({
       targets: title,
@@ -173,18 +162,9 @@ export class Menu extends Phaser.Scene {
       delay: 600,
     });
 
-    this.tweens.add({
-      targets: viewLevel1Button,
-      x: centerX - 400,
-      ease: "Sine.easeOut",
-      duration: 1000,
-      delay: 600,
-    });
-
     playButton.setInteractive({ useHandCursor: true });
     tutorialButton.setInteractive({ useHandCursor: true });
     createMapButton.setInteractive({ useHandCursor: true });
-    viewLevel1Button.setInteractive({ useHandCursor: true });
 
     playButton.on("pointerover", () => {
       playButton.setStyle({ fill: "#ff0" });
@@ -197,6 +177,7 @@ export class Menu extends Phaser.Scene {
     playButton.on("pointerdown", () => {
       console.log("Play button clicked");
       // Switch scenes here
+      this.scene.start("level_select");
     });
 
     tutorialButton.on("pointerover", () => {
@@ -223,20 +204,6 @@ export class Menu extends Phaser.Scene {
     createMapButton.on("pointerdown", () => {
       console.log("Create Map button clicked");
       // Switch scenes here
-    });
-
-    viewLevel1Button.on("pointerover", () => {
-      viewLevel1Button.setStyle({ fill: "#ff0" });
-    });
-
-    viewLevel1Button.on("pointerout", () => {
-      viewLevel1Button.setStyle({ fill: "#fff" });
-    });
-
-    viewLevel1Button.on("pointerdown", () => {
-      console.log("View Level 1 button clicked");
-      // Switch scenes here
-      this.scene.start("game");
     });
   }
 }

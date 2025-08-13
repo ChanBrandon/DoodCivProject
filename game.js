@@ -1,5 +1,6 @@
 import { Menu } from "./menu.js";
 import { GameScene } from "./gameScene.js";
+import { LevelSelect } from "./level_select.js";
 
 console.log("hello");
 
@@ -7,7 +8,7 @@ const game = new Phaser.Game({
   width: window.innerWidth,
   height: window.innerHeight,
   parent: "game",
-  scene: [Menu, GameScene],
+  scene: [Menu, GameScene, LevelSelect],
   backgroundColor: 0x191970,
   scale: {
     mode: Phaser.Scale.RESIZE,
