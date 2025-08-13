@@ -16,6 +16,12 @@ export class GameScene extends Phaser.Scene {
     this.units = [];
 
     this.highlightedTiles = [];
+
+    this.playerGold = {
+      "Player 1": 100, 
+      "AI 1": 100,
+      "AI 2": 100,
+    };
   }
 
   init(data) {
@@ -120,6 +126,9 @@ export class GameScene extends Phaser.Scene {
 
       tile.unit = unit;
       unit.boundTile = tile;
+
+      const ownerName = this.players[unit.ownerIndex];
+      tile.setOwner(ownerName);
     });
 
     this.input.on("dragend", (_pointer, sprite, dropped) => {
@@ -186,6 +195,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   advanceTurn() {
+    const current = this.currentPlayer();
+
+    const ownedTileCount = Array.from(this.tiles.values()).filter(
+      (tile) => tile.owner === current
+    ).length;
+    
+    const goldGained = ownedTileCount * 5; // Change income rate
+    this.playerGold[current] += goldGained;
+    
     this.turnIndex = (this.turnIndex + 1) % this.players.length;
     if (this.turnIndex === 0) this.round += 1;
     this.renderTurnHud();
@@ -218,11 +236,25 @@ export class GameScene extends Phaser.Scene {
       .on("pointerdown", () => this.advanceTurn())
       .setDepth(1000)
       .setScrollFactor(0);
+
+    this.goldText = this.add
+      .text(x, 160, "", {
+        fontFamily: '"JetBrains Mono", monospace',
+        fontSize: "16px",
+        color: "#ffd700", 
+        backgroundColor: "#444",
+        padding: { x: 12, y: 8 },
+      })
+      .setDepth(1000)
+      .setScrollFactor(0);
   }
 
   renderTurnHud() {
-    this.turnText.setText(
-      `Round: ${this.round}\nCurrent: ${this.currentPlayer()}\nNext: ${this.nextPlayer()}`,
-    );
+    const current = this.currentPlayer();
+    const next = this.nextPlayer();
+    const gold = this.playerGold["Player 1"];
+
+    this.turnText.setText(`Round: ${this.round}\nCurrent: ${current}\nNext: ${next}`);
+    this.goldText.setText(`Gold: ${gold}`);
   }
 }
