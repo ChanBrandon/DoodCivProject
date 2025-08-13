@@ -1,4 +1,5 @@
 import Tile from "./lib/tile.js";
+import Unit from "./lib/unit.js";
 
 export class GameScene extends Phaser.Scene {
   constructor() {
@@ -7,9 +8,14 @@ export class GameScene extends Phaser.Scene {
     this.players = ["Player 1", "AI 1", "AI 2"];
     this.turnIndex = 0;
     this.round = 1;
-    //HUD Refs
+
     this.turnText = null;
     this.endTurnBtn = null;
+
+    this.tiles = new Map();
+    this.units = [];
+
+    this.highlightedTiles = [];
   }
 
   init(data) {
@@ -20,12 +26,13 @@ export class GameScene extends Phaser.Scene {
     this.load.json("level1", "assets/levels/level1.json");
     this.load.json("level2", "assets/levels/level2.json");
     this.load.json("level3", "assets/levels/level3.json");
+
+    this.load.image("knight", "assets/knight.png");
   }
 
   create() {
     const levelData = this.cache.json.get(this.level);
 
-    this.tiles = [];
     const radius = 30;
     const hexWidth = Math.sqrt(3) * radius;
     const hexHeight = 2 * radius;
@@ -36,16 +43,93 @@ export class GameScene extends Phaser.Scene {
     const gridPixelWidth = hexWidth * cols + hexWidth / 2;
     const gridPixelHeight = hexHeight * 0.75 * rows + hexHeight / 4;
 
-    const offsetX = (this.sys.game.config.width - gridPixelWidth) / 2;
-    const offsetY = (this.sys.game.config.height - gridPixelHeight) / 2;
+    const offsetX = (this.scale.width - gridPixelWidth) / 2;
+    const offsetY = (this.scale.height - gridPixelHeight) / 2;
 
     for (const tileData of levelData.tiles) {
       const { q, r, color } = tileData;
       const tileColor = parseInt(color);
       const tile = new Tile(this, q, r, offsetX, offsetY, tileColor);
-      this.tiles.push(tile);
+
+      this.tiles.set(`${q},${r}`, tile);
+
+      const dz = this.add
+        .zone(tile.x, tile.y, hexWidth * 0.9, hexHeight * 0.9)
+        .setRectangleDropZone(hexWidth * 0.9, hexHeight * 0.9);
+
+      dz.setData("tileObj", tile);
     }
 
+    this.input.setTopOnly(true);
+
+    this.createUnitTray();
+
+    this.input.on("dragstart", (_pointer, sprite) => {
+      sprite.setDepth(2000);
+
+      const unit = sprite.unitObj;
+      if (!unit) return;
+
+      this.clearHighlightedTiles();
+
+      const reachable = unit.getReachableTiles(this.tiles);
+      reachable.forEach((tile) => {
+        tile.setColor(0xffff66); // bright yellow highlight
+        this.highlightedTiles.push(tile);
+      });
+
+      const boundTile = unit.boundTile;
+      if (boundTile) {
+        boundTile.unit = null;
+        unit.boundTile = null;
+      }
+    });
+
+    this.input.on("drag", (_pointer, sprite, dragX, dragY) => {
+      sprite.x = dragX;
+      sprite.y = dragY;
+    });
+
+    this.input.on("drop", (_pointer, sprite, dropZone) => {
+      const unit = sprite.unitObj;
+      if (!unit) {
+        this.resetToStart(sprite);
+        return;
+      }
+
+      const tile = dropZone.getData("tileObj");
+      if (!tile) {
+        this.resetToStart(sprite);
+        return;
+      }
+
+      if (tile.unit) {
+        this.resetToStart(sprite);
+        return;
+      }
+
+      const reachable = unit.getReachableTiles(this.tiles);
+      const canReach =
+        reachable.includes(tile) || (tile.q === unit.q && tile.r === unit.r);
+      if (!canReach) {
+        this.resetToStart(sprite);
+        return;
+      }
+
+      unit.moveToTile(tile);
+
+      tile.unit = unit;
+      unit.boundTile = tile;
+    });
+
+    this.input.on("dragend", (_pointer, sprite, dropped) => {
+      if (!dropped) this.resetToStart(sprite);
+      sprite.setDepth(10);
+
+      this.clearHighlightedTiles();
+    });
+
+    // HUD
     this.createTurnHud();
     this.renderTurnHud();
 
@@ -56,6 +140,41 @@ export class GameScene extends Phaser.Scene {
       if (this.turnText) this.turnText.setPosition(x, 20);
       if (this.endTurnBtn) this.endTurnBtn.setPosition(x, 92);
     });
+  }
+
+  createUnitTray() {
+    const playerIndex = this.turnIndex;
+    const trayX = 80;
+    const startY = 80;
+    const spacing = 60;
+
+    for (let i = 0; i < 3; i++) {
+      const unit = new Unit(this, null, null, "knight", playerIndex, 3);
+      unit.sprite.x = trayX;
+      unit.sprite.y = startY + i * spacing;
+
+      unit.startX = unit.sprite.x;
+      unit.startY = unit.sprite.y;
+
+      this.units.push(unit);
+    }
+  }
+
+  resetToStart(sprite) {
+    const unit = sprite.unitObj;
+    if (unit) {
+      unit.resetPosition();
+    } else {
+      sprite.x = sprite.startX || sprite.x;
+      sprite.y = sprite.startY || sprite.y;
+    }
+  }
+
+  clearHighlightedTiles() {
+    this.highlightedTiles.forEach((tile) => {
+      tile.setColor(tile.baseColor);
+    });
+    this.highlightedTiles = [];
   }
 
   currentPlayer() {
