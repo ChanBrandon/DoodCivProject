@@ -33,16 +33,20 @@ class Combat {
   }
 
   // checks the attack range of a unit across the tiles
-  // uses the idea of the Manhattan Distance
-  // attkpos: uses the position of the unit
-  // attkMovement: how far a unit can move
-  // range: how far the unit can attack
-  // vPos: the position of the victim
-  async check_range(attkPos, attkMovement, range, vPos) {
-    let threatRange = attkMovement + range;
-    // calculate the manhattan distance using threatRange and vPos
+  // a_q: attacker column position
+  // a_r: attacker row position
+  // a_range: range of attacker from units_data
+  // v_q: victim column position
+  // v_r: victim row position
+  async check_range(a_q, a_r, a_range, v_q, v_r) {
 
-    // return true if
+    let dist = Math.abs(a_q - v_q) + Math.abs(a_r - v_r) + (a_q - v_q + a_r - v_r)
+    if (dist == a_range) {
+      // means unit can attack
+      return true;
+    }
+    // means unit cannot attack
+    return false;
   }
 
   // returns true if enemy is detected within the unit's range

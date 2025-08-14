@@ -19,13 +19,15 @@ class SelectEntity {
         return unit.rows[0];
     }
 
+        // TODO: UPDATE THIS TO HAVE q_pos, r_pos
+
     // Inserts the a new unit into the units_state table
     // Should be called when a new unit is bought
     // unit: A JSON containing: id, unit_type, current_health
     // pos: the position the unit will be on
     async initiateUnit(unit, pos, player) {
-        let command = `INSERT INTO units_state(id, unit_type, current_health, map_pos, owned_by) VALUES($1, $2, $3, $4, $5)`;
-        await pool.query(command, [unit.id, unit.unit_type, unit.current_health, pos, player]);
+        let command = `INSERT INTO units_state(unit_type, current_health, map_pos, owned_by) VALUES($1, $2, $3, $4)`;
+        await pool.query(command, [unit.unit_type, unit.current_health, pos, player]);
     }
 
     // renamed putUnit and changed it since the below function was identical 
@@ -73,18 +75,21 @@ class SelectEntity {
         await pool.query(command, health, id);
     }
 
+        // TODO: UPDATE THIS TO HAVE q_pos, r_pos
     async getUnitPosition(id) {
         let command = `SELECT map_pos FROM units_state WHERE id = $1`;
         let pos = await pool.query(command, id);
         return pos;
     }
 
+        // TODO: UPDATE THIS TO HAVE q_pos, r_pos
     async getUnitMovement() {
         let command = `SELECT move_range FROM units_data WHERE name = $1`;
         let pos = await pool.query(command, id);
         return pos;
     }
 
+    // TODO: UPDATE THIS TO HAVE q_pos, r_pos
     // Updates unit map position in units_state
     // Should be called when unit moves
     async updateUnitPos(id, pos) {
