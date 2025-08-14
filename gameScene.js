@@ -1,9 +1,12 @@
 import Tile from "./lib/tile.js";
+import UnitTray from "./lib/unitTray.js";
 import Unit from "./lib/unit.js";
 
 export class GameScene extends Phaser.Scene {
   constructor() {
     super("game");
+
+    this.Unit = Unit;
 
     this.players = ["Player 1", "AI 1", "AI 2"];
     this.turnIndex = 0;
@@ -11,6 +14,7 @@ export class GameScene extends Phaser.Scene {
 
     this.turnText = null;
     this.endTurnBtn = null;
+    this.goldText = null;
 
     this.tiles = new Map();
     this.units = [];
@@ -18,7 +22,7 @@ export class GameScene extends Phaser.Scene {
     this.highlightedTiles = [];
 
     this.playerGold = {
-      "Player 1": 100, 
+      "Player 1": 100,
       "AI 1": 100,
       "AI 2": 100,
     };
@@ -34,6 +38,7 @@ export class GameScene extends Phaser.Scene {
     this.load.json("level3", "assets/levels/level3.json");
 
     this.load.image("knight", "assets/knight.png");
+    this.load.image("lancer", "assets/lancer.png");
   }
 
   create() {
@@ -52,10 +57,24 @@ export class GameScene extends Phaser.Scene {
     const offsetX = (this.scale.width - gridPixelWidth) / 2;
     const offsetY = (this.scale.height - gridPixelHeight) / 2;
 
+    const playerColors = {
+      "Player 1": 0x3377cc,
+      "AI 1": 0xd2042d,
+      "AI 2": 0xcc3333,
+    };
+
+    // Create tiles and assign ownership based on color
     for (const tileData of levelData.tiles) {
       const { q, r, color } = tileData;
       const tileColor = parseInt(color);
       const tile = new Tile(this, q, r, offsetX, offsetY, tileColor);
+
+      for (const [playerName, playerColor] of Object.entries(playerColors)) {
+        if (tileColor === playerColor) {
+          tile.setOwner(playerName);
+          break;
+        }
+      }
 
       this.tiles.set(`${q},${r}`, tile);
 
@@ -70,74 +89,6 @@ export class GameScene extends Phaser.Scene {
 
     this.createUnitTray();
 
-    this.input.on("dragstart", (_pointer, sprite) => {
-      sprite.setDepth(2000);
-
-      const unit = sprite.unitObj;
-      if (!unit) return;
-
-      this.clearHighlightedTiles();
-
-      const reachable = unit.getReachableTiles(this.tiles);
-      reachable.forEach((tile) => {
-        tile.setColor(0xffff66); // bright yellow highlight
-        this.highlightedTiles.push(tile);
-      });
-
-      const boundTile = unit.boundTile;
-      if (boundTile) {
-        boundTile.unit = null;
-        unit.boundTile = null;
-      }
-    });
-
-    this.input.on("drag", (_pointer, sprite, dragX, dragY) => {
-      sprite.x = dragX;
-      sprite.y = dragY;
-    });
-
-    this.input.on("drop", (_pointer, sprite, dropZone) => {
-      const unit = sprite.unitObj;
-      if (!unit) {
-        this.resetToStart(sprite);
-        return;
-      }
-
-      const tile = dropZone.getData("tileObj");
-      if (!tile) {
-        this.resetToStart(sprite);
-        return;
-      }
-
-      if (tile.unit) {
-        this.resetToStart(sprite);
-        return;
-      }
-
-      const reachable = unit.getReachableTiles(this.tiles);
-      const canReach =
-        reachable.includes(tile) || (tile.q === unit.q && tile.r === unit.r);
-      if (!canReach) {
-        this.resetToStart(sprite);
-        return;
-      }
-
-      unit.moveToTile(tile);
-
-      tile.unit = unit;
-      unit.boundTile = tile;
-
-      const ownerName = this.players[unit.ownerIndex];
-      tile.setOwner(ownerName);
-    });
-
-    this.input.on("dragend", (_pointer, sprite, dropped) => {
-      if (!dropped) this.resetToStart(sprite);
-      sprite.setDepth(10);
-
-      this.clearHighlightedTiles();
-    });
-
     // HUD
     this.createTurnHud();
     this.renderTurnHud();
@@ -148,35 +99,14 @@ export class GameScene extends Phaser.Scene {
       const x = size.width - 260;
       if (this.turnText) this.turnText.setPosition(x, 20);
       if (this.endTurnBtn) this.endTurnBtn.setPosition(x, 92);
+      if (this.goldText) this.goldText.setPosition(x, 160);
     });
   }
 
   createUnitTray() {
-    const playerIndex = this.turnIndex;
-    const trayX = 80;
-    const startY = 80;
-    const spacing = 60;
+    console.log("unit tray!");
 
-    for (let i = 0; i < 3; i++) {
-      const unit = new Unit(this, null, null, "knight", playerIndex, 3);
-      unit.sprite.x = trayX;
-      unit.sprite.y = startY + i * spacing;
-
-      unit.startX = unit.sprite.x;
-      unit.startY = unit.sprite.y;
-
-      this.units.push(unit);
-    }
-  }
-
-  resetToStart(sprite) {
-    const unit = sprite.unitObj;
-    if (unit) {
-      unit.resetPosition();
-    } else {
-      sprite.x = sprite.startX || sprite.x;
-      sprite.y = sprite.startY || sprite.y;
-    }
+    new UnitTray(this, 80, 80, "knight", "Player 1", Unit);
   }
 
   clearHighlightedTiles() {
@@ -197,13 +127,19 @@ export class GameScene extends Phaser.Scene {
   advanceTurn() {
     const current = this.currentPlayer();
 
+    for (let unit of this.units) {
+      if (unit.owner == current) {
+        unit.moved = false;
+      }
+    }
+
     const ownedTileCount = Array.from(this.tiles.values()).filter(
-      (tile) => tile.owner === current
+      (tile) => tile.owner === current,
     ).length;
-    
-    const goldGained = ownedTileCount * 5; // Change income rate
+
+    const goldGained = ownedTileCount * 5;
     this.playerGold[current] += goldGained;
-    
+
     this.turnIndex = (this.turnIndex + 1) % this.players.length;
     if (this.turnIndex === 0) this.round += 1;
     this.renderTurnHud();
@@ -241,7 +177,7 @@ export class GameScene extends Phaser.Scene {
       .text(x, 160, "", {
         fontFamily: '"JetBrains Mono", monospace',
         fontSize: "16px",
-        color: "#ffd700", 
+        color: "#ffd700",
         backgroundColor: "#444",
         padding: { x: 12, y: 8 },
       })
@@ -254,7 +190,9 @@ export class GameScene extends Phaser.Scene {
     const next = this.nextPlayer();
     const gold = this.playerGold["Player 1"];
 
-    this.turnText.setText(`Round: ${this.round}\nCurrent: ${current}\nNext: ${next}`);
+    this.turnText.setText(
+      `Round: ${this.round}\nCurrent: ${current}\nNext: ${next}`,
+    );
     this.goldText.setText(`Gold: ${gold}`);
   }
 }
