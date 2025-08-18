@@ -21,6 +21,10 @@ export class GameScene extends Phaser.Scene {
 
     this.highlightedTiles = [];
 
+    // for combat
+    this.selectedUnit = null; // attacker
+    this.targetUnit = null; // victim of attacker
+
     this.playerGold = {
       "Player 1": 100,
       "AI 1": 100,
@@ -37,11 +41,20 @@ export class GameScene extends Phaser.Scene {
     this.load.json("level2", "assets/levels/level2.json");
     this.load.json("level3", "assets/levels/level3.json");
 
+    this.load.image("scout", "asset/scout.png");
+    this.load.image("warrior", "asset/warrior.png");
+    this.load.image("swordsman", "asset/swordsman");
     this.load.image("knight", "assets/knight.png");
+    this.load.image("slinger", "asset/slinger");
+    this.load.image("archer", "asset/archer");
+    this.load.image("musketeer", "asset/musketeer");
+    this.load.image("horseman", "asset/horseman");
     this.load.image("lancer", "assets/lancer.png");
+    this.load.image("chariot", "asset/chariot");
+
   }
 
-  create() {
+  async create() {
     const levelData = this.cache.json.get(this.level);
 
     const radius = 30;
@@ -84,14 +97,18 @@ export class GameScene extends Phaser.Scene {
 
       dz.setData("tileObj", tile);
     }
-
+    
     this.input.setTopOnly(true);
-
+    
     this.createUnitTray();
 
     // HUD
     this.createTurnHud();
     this.renderTurnHud();
+
+    // console.log("before loading");
+    await this.loadUnitsFromDB();
+    // console.log("after loading");
 
     this.input.keyboard.on("keydown-SPACE", () => this.advanceTurn());
 
@@ -101,7 +118,19 @@ export class GameScene extends Phaser.Scene {
       if (this.endTurnBtn) this.endTurnBtn.setPosition(x, 92);
       if (this.goldText) this.goldText.setPosition(x, 160);
     });
+
+    this.input.on("gameobjectdown", async (_pointer, obj) => {
+      // Units will only respond to being clicked on 
+      if (obj.unitId) {
+        const unit = this.units.find((unit) => unit.id === obj.unitId);
+        if (unit) {
+          this.onUnitClick(unit);
+        }
+      } 
+    });
   }
+
+
 
   createUnitTray() {
     console.log("unit tray!");
@@ -194,5 +223,99 @@ export class GameScene extends Phaser.Scene {
       `Round: ${this.round}\nCurrent: ${current}\nNext: ${next}`,
     );
     this.goldText.setText(`Gold: ${gold}`);
+  }
+
+  async loadUnitsFromDB() {
+    try {
+      const res = await fetch(`/get_all_units`);
+      const unitsData = await res.json();
+      
+      console.log(unitsData);
+      for (let unitData of unitsData) {
+        const unit = new this.Unit(this, unitData.q_pos, unitData.r_pos, unitData.unit_type, unitData.owned_by);
+        unit.id = unitData.id;
+        unit.sprite.unitId = unitData.id;
+        const tileKey = `${unit.q_pos},${unit.r_pos}`;
+        const tile = this.tiles.get(tileKey);
+        if(tile) {
+          unit.moveToTile(tile);
+          tile.unit = unit;
+          unit.boundTile = tile;
+        }
+        this.units.push(unit);
+      }
+    } catch (error) {
+      console.error("Error loading units from Database:", error);
+    }
+  }
+
+  async checkUnitRange(attackerId, victimId) {
+    try {
+      const res = await fetch(`/detect_units?attackId=${attackerId}&enemyId=${victimId}`);
+      const inRange = await res.json(); // true or false
+      return inRange;
+    } catch (error) {
+      console.error("Error checking range:", error);
+      return false;
+    }
+  }
+
+  async onUnitClick(unit) {
+    if (!this.selectedUnit) {
+      // ensure player can only click on thier own units
+      if (unit.owner !== this.currentPlayer()) {
+        return;
+      }
+      this.selectedUnit = unit;
+      // highlight the selected unit
+      // unit.sprite.setTint(0x00ff00);
+    } else {
+      // prevent attacking your own units
+      if (unit.owner === this.currentPlayer()) {
+        return;
+      }
+      this.targetUnit = unit;
+
+      const inRange = await this.checkUnitRange(this.selectedUnit.id, this.targetUnit.id);
+      if (inRange) {
+        await this.combat(this.selectedUnit, this.targetUnit);
+      } else {
+        console.log("Target out of range");
+      }
+
+      this.selectedUnit.sprite.clearTint();
+      this.selectedUnit = null;
+      this.targetUnit = null;
+    }
+  }
+
+  async combat(attackerId, victimId) {
+    try {
+      let res = await fetch(`/combat?attackerId=${attackerId}&victimId=${victimId}`);
+      let data = await res.json();
+
+      if (data.error) {
+        console.error("Error:", data.error);
+        return;
+      }
+
+      if (data.victimUpdated && data.victimUpdated.current_health > 0) {
+        let victimSprite = this.units.find(unit => unit.id === victimId)?.sprite;
+        if (victimSprite) {
+          console.log(`Victim ${victimId} now has ${data.victimUpdated.current_health} HP`);
+        }
+      }
+
+      if (data.victimDefeated) {
+        let victimSprite = this.units.find(unit => unit.id === victimId);
+        if (victimSprite) {
+          victimSprite.destroy();
+          //
+        }
+      }
+
+    } catch (error) {
+      console.error("Error, combat request failed:", error)
+    }
   }
 }
