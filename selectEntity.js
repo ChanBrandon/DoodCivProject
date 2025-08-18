@@ -21,7 +21,7 @@ class SelectEntity {
 
         // TODO: UPDATE THIS TO HAVE q_pos, r_pos
 
-    // Inserts the a new unit into the units_state table
+    // Inserts the new unit into the units_state table
     // Should be called when a new unit is bought
     // unit: A JSON containing: id, unit_type, current_health
     // pos: the position the unit will be on
@@ -42,8 +42,8 @@ class SelectEntity {
     // gets the unit on the board using the id of that unit
     async getUnitState(id) {
         let command = `SELECT * FROM units_state WHERE id = $1`;
-        let unit = await pool.query(command, id);
-        return unit;
+        let unit = await pool.query(command, [id]);
+        return unit.rows[0];
     }
 
     // gets the unit on the board using the name of that unit
