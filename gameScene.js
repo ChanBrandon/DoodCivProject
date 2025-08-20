@@ -8,7 +8,7 @@ export class GameScene extends Phaser.Scene {
 
     this.Unit = Unit;
 
-    this.players = ["Player 1", "AI 1", "AI 2"];
+    this.players = ["Player 1"];
     this.turnIndex = 0;
     this.round = 1;
 
@@ -56,6 +56,23 @@ export class GameScene extends Phaser.Scene {
 
   async create() {
     const levelData = this.cache.json.get(this.level);
+
+    // Reset players table when loading new level
+    await fetch("http://localhost:3000/clear_table?name=players");
+
+    // Add players to array according to level data
+    for (let i = 1; i < levelData.num_enemies + 1; i++) {
+      this.players.push("AI " + i.toString());
+    }
+
+    // Add players to database
+    for (let player_name of this.players) {
+      await fetch("http://localhost:3000/add_player", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ player: player_name })
+      })
+    }
 
     const radius = 30;
     const hexWidth = Math.sqrt(3) * radius;
