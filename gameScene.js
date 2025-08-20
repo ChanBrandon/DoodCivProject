@@ -107,7 +107,7 @@ export class GameScene extends Phaser.Scene {
     this.renderTurnHud();
 
     // console.log("before loading");
-    await this.loadUnitsFromDB();
+    await this.loadUnitDataFromDB();
     // console.log("after loading");
 
     this.input.keyboard.on("keydown-SPACE", () => this.advanceTurn());
@@ -128,6 +128,32 @@ export class GameScene extends Phaser.Scene {
         }
       } 
     });
+
+    this.selectedUnit = null;
+
+    this.units.forEach(unit => {
+      unit.sprite.setInteractive();
+
+      unit.sprite.on("pointerdown", () => {
+        if (!this.selectedUnit) {
+          // 1 is the player id, change if necessary
+          if (unit.owned_by === 1) {
+            this.selectedUnit = unit;
+            console.log(`Selected attacker: ${unit.unit_type} ID: ${unit.id}`);
+          }
+          return;
+        }
+
+        if (this.selectedUnit && unit.owned_by !== this.selectedUnit.owned_by) {
+          console.log(`Attacking victim: ${unit.unit_type} ID: ${unit.id}`);
+
+          this.combat(this.selectedUnit.id, unit.id);
+
+          this.selectedUnit = null;
+        }
+      })
+    })
+    
   }
 
 
@@ -225,7 +251,8 @@ export class GameScene extends Phaser.Scene {
     this.goldText.setText(`Gold: ${gold}`);
   }
 
-  async loadUnitsFromDB() {
+  // load the units from units_data
+  async loadUnitDataFromDB() {
     try {
       const res = await fetch(`/get_all_units`);
       const unitsData = await res.json();
@@ -278,7 +305,7 @@ export class GameScene extends Phaser.Scene {
 
       const inRange = await this.checkUnitRange(this.selectedUnit.id, this.targetUnit.id);
       if (inRange) {
-        await this.combat(this.selectedUnit, this.targetUnit);
+        await this.combat(this.selectedUnit.id, this.targetUnit.id);
       } else {
         console.log("Target out of range");
       }
@@ -300,17 +327,17 @@ export class GameScene extends Phaser.Scene {
       }
 
       if (data.victimUpdated && data.victimUpdated.current_health > 0) {
-        let victimSprite = this.units.find(unit => unit.id === victimId)?.sprite;
-        if (victimSprite) {
+        let victimUnit = this.units.find(unit => unit.id === victimId);
+        if (victimUnit) {
           console.log(`Victim ${victimId} now has ${data.victimUpdated.current_health} HP`);
         }
       }
 
       if (data.victimDefeated) {
-        let victimSprite = this.units.find(unit => unit.id === victimId);
-        if (victimSprite) {
-          victimSprite.destroy();
-          //
+        let victimIndex = this.units.find(unit => unit.id === victimId);
+        if (victimIndex !== -1) {
+          this.units[victimSprite].sprite.destroy();
+          this.units.splice(victimSprite, 1);
         }
       }
 
