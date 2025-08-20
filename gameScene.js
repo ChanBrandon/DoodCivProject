@@ -1,6 +1,7 @@
 import Tile from "./lib/tile.js";
 import UnitTray from "./lib/unitTray.js";
 import Unit from "./lib/unit.js";
+import EnemyAI from "./lib/enemyAI.js";
 
 export class GameScene extends Phaser.Scene {
   constructor() {
@@ -12,6 +13,8 @@ export class GameScene extends Phaser.Scene {
     this.turnIndex = 0;
     this.round = 1;
 
+    this.AIs = [];
+
     this.turnText = null;
     this.endTurnBtn = null;
     this.goldText = null;
@@ -21,14 +24,12 @@ export class GameScene extends Phaser.Scene {
 
     this.highlightedTiles = [];
 
-    // for combat
-    this.selectedUnit = null; // attacker
-    this.targetUnit = null; // victim of attacker
+    // combat
+    this.selectedUnit = null;
+    this.targetUnit = null;
 
     this.playerGold = {
       "Player 1": 100,
-      "AI 1": 100,
-      "AI 2": 100,
     };
   }
 
@@ -43,35 +44,30 @@ export class GameScene extends Phaser.Scene {
 
     this.load.image("scout", "asset/scout.png");
     this.load.image("warrior", "asset/warrior.png");
-    this.load.image("swordsman", "asset/swordsman");
     this.load.image("knight", "assets/knight.png");
-    this.load.image("slinger", "asset/slinger");
-    this.load.image("archer", "asset/archer");
-    this.load.image("musketeer", "asset/musketeer");
-    this.load.image("horseman", "asset/horseman");
     this.load.image("lancer", "assets/lancer.png");
-    this.load.image("chariot", "asset/chariot");
-
   }
 
   async create() {
     const levelData = this.cache.json.get(this.level);
 
-    // Reset players table when loading new level
+    // Reset players table
     await fetch("http://localhost:3000/clear_table?name=players");
 
-    // Add players to array according to level data
     for (let i = 1; i < levelData.num_enemies + 1; i++) {
-      this.players.push("AI " + i.toString());
+      const aiName = "AI " + i;
+      this.players.push(aiName);
+      this.playerGold[aiName] = 100;
+
+      this.AIs.push(new EnemyAI(this, aiName));
     }
 
-    // Add players to database
     for (let player_name of this.players) {
       await fetch("http://localhost:3000/add_player", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ player: player_name })
-      })
+        body: JSON.stringify({ player: player_name }),
+      });
     }
 
     const radius = 30;
@@ -93,7 +89,6 @@ export class GameScene extends Phaser.Scene {
       "AI 2": 0xcc3333,
     };
 
-    // Create tiles and assign ownership based on color
     for (const tileData of levelData.tiles) {
       const { q, r, color } = tileData;
       const tileColor = parseInt(color);
@@ -111,21 +106,18 @@ export class GameScene extends Phaser.Scene {
       const dz = this.add
         .zone(tile.x, tile.y, hexWidth * 0.9, hexHeight * 0.9)
         .setRectangleDropZone(hexWidth * 0.9, hexHeight * 0.9);
-
       dz.setData("tileObj", tile);
     }
-    
+
     this.input.setTopOnly(true);
-    
+
     this.createUnitTray();
 
     // HUD
     this.createTurnHud();
     this.renderTurnHud();
 
-    // console.log("before loading");
     await this.loadUnitDataFromDB();
-    // console.log("after loading");
 
     this.input.keyboard.on("keydown-SPACE", () => this.advanceTurn());
 
@@ -137,54 +129,39 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.input.on("gameobjectdown", async (_pointer, obj) => {
-      // Units will only respond to being clicked on 
       if (obj.unitId) {
         const unit = this.units.find((unit) => unit.id === obj.unitId);
         if (unit) {
           this.onUnitClick(unit);
         }
-      } 
+      }
     });
 
     this.selectedUnit = null;
 
-    this.units.forEach(unit => {
+    this.units.forEach((unit) => {
       unit.sprite.setInteractive();
-
       unit.sprite.on("pointerdown", () => {
         if (!this.selectedUnit) {
-          // 1 is the player id, change if necessary
-          if (unit.owned_by === 1) {
+          if (unit.owner === "Player 1") {
             this.selectedUnit = unit;
-            console.log(`Selected attacker: ${unit.unit_type} ID: ${unit.id}`);
           }
           return;
         }
-
-        if (this.selectedUnit && unit.owned_by !== this.selectedUnit.owned_by) {
-          console.log(`Attacking victim: ${unit.unit_type} ID: ${unit.id}`);
-
+        if (this.selectedUnit && unit.owner !== this.selectedUnit.owner) {
           this.combat(this.selectedUnit.id, unit.id);
-
           this.selectedUnit = null;
         }
-      })
-    })
-    
+      });
+    });
   }
 
-
-
   createUnitTray() {
-    console.log("unit tray!");
-
     new UnitTray(this, 80, 80, "knight", "Player 1", Unit);
   }
 
   clearHighlightedTiles() {
-    this.highlightedTiles.forEach((tile) => {
-      tile.setColor(tile.baseColor);
-    });
+    this.highlightedTiles.forEach((tile) => tile.setColor(tile.baseColor));
     this.highlightedTiles = [];
   }
 
@@ -199,38 +176,41 @@ export class GameScene extends Phaser.Scene {
   advanceTurn() {
     const current = this.currentPlayer();
 
-    for (let unit of this.units) {
-      if (unit.owner == current) {
-        unit.moved = false;
-      }
-    }
+    this.units.forEach((unit) => {
+      if (unit.owner === current) unit.moved = false;
+    });
 
     const ownedTileCount = Array.from(this.tiles.values()).filter(
       (tile) => tile.owner === current,
     ).length;
-
     const goldGained = ownedTileCount * 5;
     this.playerGold[current] += goldGained;
 
+    if (current.startsWith("AI")) {
+      const ai = this.AIs.find((ai) => ai.name === current);
+      if (ai) {
+        ai.newTurn();
+        ai.takeTurn();
+      }
+    }
+
     this.turnIndex = (this.turnIndex + 1) % this.players.length;
     if (this.turnIndex === 0) this.round += 1;
+
     this.renderTurnHud();
   }
 
   createTurnHud() {
     const x = this.scale.width - 260;
 
-    this.turnText = this.add
-      .text(x, 20, "", {
-        fontFamily: '"JetBrains Mono", monospace',
-        fontSize: "20px",
-        color: "#ffffff",
-        backgroundColor: "#262c44",
-        padding: { x: 12, y: 8 },
-        align: "left",
-      })
-      .setDepth(1000)
-      .setScrollFactor(0);
+    this.turnText = this.add.text(x, 20, "", {
+      fontFamily: '"JetBrains Mono", monospace',
+      fontSize: "20px",
+      color: "#ffffff",
+      backgroundColor: "#262c44",
+      padding: { x: 12, y: 8 },
+      align: "left",
+    });
 
     this.endTurnBtn = this.add
       .text(x, 92, "End Turn (Space)", {
@@ -241,20 +221,15 @@ export class GameScene extends Phaser.Scene {
         padding: { x: 12, y: 8 },
       })
       .setInteractive({ useHandCursor: true })
-      .on("pointerdown", () => this.advanceTurn())
-      .setDepth(1000)
-      .setScrollFactor(0);
+      .on("pointerdown", () => this.advanceTurn());
 
-    this.goldText = this.add
-      .text(x, 160, "", {
-        fontFamily: '"JetBrains Mono", monospace',
-        fontSize: "16px",
-        color: "#ffd700",
-        backgroundColor: "#444",
-        padding: { x: 12, y: 8 },
-      })
-      .setDepth(1000)
-      .setScrollFactor(0);
+    this.goldText = this.add.text(x, 160, "", {
+      fontFamily: '"JetBrains Mono", monospace',
+      fontSize: "16px",
+      color: "#ffd700",
+      backgroundColor: "#444",
+      padding: { x: 12, y: 8 },
+    });
   }
 
   renderTurnHud() {
@@ -268,20 +243,23 @@ export class GameScene extends Phaser.Scene {
     this.goldText.setText(`Gold: ${gold}`);
   }
 
-  // load the units from units_data
   async loadUnitDataFromDB() {
     try {
       const res = await fetch(`/get_all_units`);
       const unitsData = await res.json();
-      
-      console.log(unitsData);
+
       for (let unitData of unitsData) {
-        const unit = new this.Unit(this, unitData.q_pos, unitData.r_pos, unitData.unit_type, unitData.owned_by);
+        const unit = new this.Unit(
+          this,
+          unitData.q_pos,
+          unitData.r_pos,
+          unitData.unit_type,
+          unitData.owned_by,
+        );
         unit.id = unitData.id;
         unit.sprite.unitId = unitData.id;
-        const tileKey = `${unit.q_pos},${unit.r_pos}`;
-        const tile = this.tiles.get(tileKey);
-        if(tile) {
+        const tile = this.tiles.get(`${unit.q_pos},${unit.r_pos}`);
+        if (tile) {
           unit.moveToTile(tile);
           tile.unit = unit;
           unit.boundTile = tile;
@@ -295,9 +273,10 @@ export class GameScene extends Phaser.Scene {
 
   async checkUnitRange(attackerId, victimId) {
     try {
-      const res = await fetch(`/detect_units?attackId=${attackerId}&enemyId=${victimId}`);
-      const inRange = await res.json(); // true or false
-      return inRange;
+      const res = await fetch(
+        `/detect_units?attackId=${attackerId}&enemyId=${victimId}`,
+      );
+      return await res.json();
     } catch (error) {
       console.error("Error checking range:", error);
       return false;
@@ -306,28 +285,19 @@ export class GameScene extends Phaser.Scene {
 
   async onUnitClick(unit) {
     if (!this.selectedUnit) {
-      // ensure player can only click on thier own units
-      if (unit.owner !== this.currentPlayer()) {
-        return;
-      }
+      if (unit.owner !== this.currentPlayer()) return;
       this.selectedUnit = unit;
-      // highlight the selected unit
-      // unit.sprite.setTint(0x00ff00);
     } else {
-      // prevent attacking your own units
-      if (unit.owner === this.currentPlayer()) {
-        return;
-      }
+      if (unit.owner === this.currentPlayer()) return;
       this.targetUnit = unit;
 
-      const inRange = await this.checkUnitRange(this.selectedUnit.id, this.targetUnit.id);
+      const inRange = await this.checkUnitRange(
+        this.selectedUnit.id,
+        this.targetUnit.id,
+      );
       if (inRange) {
         await this.combat(this.selectedUnit.id, this.targetUnit.id);
-      } else {
-        console.log("Target out of range");
       }
-
-      this.selectedUnit.sprite.clearTint();
       this.selectedUnit = null;
       this.targetUnit = null;
     }
@@ -335,7 +305,9 @@ export class GameScene extends Phaser.Scene {
 
   async combat(attackerId, victimId) {
     try {
-      let res = await fetch(`/combat?attackerId=${attackerId}&victimId=${victimId}`);
+      let res = await fetch(
+        `/combat?attackerId=${attackerId}&victimId=${victimId}`,
+      );
       let data = await res.json();
 
       if (data.error) {
@@ -344,22 +316,23 @@ export class GameScene extends Phaser.Scene {
       }
 
       if (data.victimUpdated && data.victimUpdated.current_health > 0) {
-        let victimUnit = this.units.find(unit => unit.id === victimId);
+        let victimUnit = this.units.find((unit) => unit.id === victimId);
         if (victimUnit) {
-          console.log(`Victim ${victimId} now has ${data.victimUpdated.current_health} HP`);
+          console.log(
+            `Victim ${victimId} now has ${data.victimUpdated.current_health} HP`,
+          );
         }
       }
 
       if (data.victimDefeated) {
-        let victimIndex = this.units.find(unit => unit.id === victimId);
+        let victimIndex = this.units.findIndex((unit) => unit.id === victimId);
         if (victimIndex !== -1) {
-          this.units[victimSprite].sprite.destroy();
-          this.units.splice(victimSprite, 1);
+          this.units[victimIndex].sprite.destroy();
+          this.units.splice(victimIndex, 1);
         }
       }
-
     } catch (error) {
-      console.error("Error, combat request failed:", error)
+      console.error("Error, combat request failed:", error);
     }
   }
 }

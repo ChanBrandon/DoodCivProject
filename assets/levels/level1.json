@@ -1,5 +1,5 @@
 {
-  "num_enemies": 2,
+  "num_enemies": 1,
   "rows": 9,
   "cols": 9,
   "tiles": [
@@ -74,4 +74,3 @@
     { "r": 7, "q": 6, "color": "0xD2042D" }
   ]
 }
-
