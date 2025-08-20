@@ -2,6 +2,7 @@ import Tile from "./lib/tile.js";
 import UnitTray from "./lib/unitTray.js";
 import Unit from "./lib/unit.js";
 import EnemyAI from "./lib/enemyAI.js";
+import UnitProgression from "./UnitProgression.js";
 
 export class GameScene extends Phaser.Scene {
   constructor() {
@@ -42,6 +43,12 @@ export class GameScene extends Phaser.Scene {
     this.load.image("warrior", "asset/warrior.png");
     this.load.image("knight", "assets/knight.png");
     this.load.image("lancer", "assets/lancer.png");
+    this.load.image("slinger", "assets/slinger.png");
+    this.load.image("archer", "assets/archer.png");
+    this.load.image("swordsman", "assets/swordsman.png");
+    this.load.image("horseman", "assets/horseman.png");
+    this.load.image("chariot", "assets/chariot.png");
+    this.load.image("musketeer", "assets/musketeer.png");
   }
 
   async create() {
@@ -64,6 +71,46 @@ export class GameScene extends Phaser.Scene {
         body: JSON.stringify({ player: player_name }),
       });
     }
+
+    // ===== UNIT PROGRESSION HUD (LEFT PANEL) =====
+    // Tiers are easy to tweak; icons use your existing PNGs in /assets
+    const units = [
+      // Tier 1
+      { id: "warrior",   name: "Warrior",   tier: 1, iconKey: "warrior" },
+      { id: "slinger",   name: "Slinger",   tier: 1, iconKey: "slinger" },
+      { id: "scout",     name: "Scout",     tier: 1, iconKey: "scout"   },
+
+      // Tier 2
+      { id: "archer",    name: "Archer",    tier: 2, iconKey: "archer" },
+      { id: "swordsman", name: "Swordsman", tier: 2, iconKey: "swordsman" },
+      { id: "horseman",  name: "Horseman",  tier: 2, iconKey: "horseman" },
+
+      // Tier 3
+      { id: "knight",    name: "Knight",    tier: 3, iconKey: "knight" },
+      { id: "chariot",   name: "Chariot",   tier: 3, iconKey: "chariot" },
+      { id: "lancer",    name: "Lancer",    tier: 3, iconKey: "lancer" },
+
+      // Tier 4
+      { id: "musketeer", name: "Musketeer", tier: 4, iconKey: "musketeer" },
+    ];
+
+    this.unitUI = new UnitProgression(this, {
+      units,
+      turnsPerTier: 5, // unlock next tier every 5 rounds
+      onTierUnlock: (tier) => {
+        // optional: toast/SFX/etc.
+        console.log(`Unlocked Tier ${tier}`);
+      },
+    });
+
+    // If you don’t have a global TurnManager emitting "turn:changed",
+    // call this when your round changes:
+    // this.unitUI.applyRound(this.round);
+
+    // Keep panel sized on resize (UnitProgression also listens, but safe)
+    this.scale.on("resize", (size) => {
+      // nothing else required; UnitProgression re-lays out on resize
+    });
 
     const radius = 30;
     const hexWidth = Math.sqrt(3) * radius;
@@ -153,6 +200,10 @@ export class GameScene extends Phaser.Scene {
 
   createUnitTray() {
     new UnitTray(this, 80, 80, "knight", "Player 1", Unit);
+  }
+
+  shutdown() {
+    this.unitUI?.destroy();
   }
 
   clearHighlightedTiles() {
