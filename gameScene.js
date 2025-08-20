@@ -53,7 +53,6 @@ export class GameScene extends Phaser.Scene {
     for (let i = 1; i < levelData.num_enemies + 1; i++) {
       const aiName = "AI " + i;
       this.players.push(aiName);
-      this.playerGold[aiName] = 100;
 
       this.AIs.push(new EnemyAI(this, aiName));
     }
