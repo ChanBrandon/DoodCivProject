@@ -27,10 +27,6 @@ export class GameScene extends Phaser.Scene {
     // combat
     this.selectedUnit = null;
     this.targetUnit = null;
-
-    this.playerGold = {
-      "Player 1": 100,
-    };
   }
 
   init(data) {
@@ -173,7 +169,7 @@ export class GameScene extends Phaser.Scene {
     return this.players[(this.turnIndex + 1) % this.players.length];
   }
 
-  advanceTurn() {
+  async advanceTurn() {
     const current = this.currentPlayer();
 
     this.units.forEach((unit) => {
@@ -184,7 +180,12 @@ export class GameScene extends Phaser.Scene {
       (tile) => tile.owner === current,
     ).length;
     const goldGained = ownedTileCount * 5;
-    this.playerGold[current] += goldGained;
+    this.playerGold += goldGained;
+    await fetch("http://localhost:3000/set_gold", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: current, gold: this.playerGold })
+    })
 
     if (current.startsWith("AI")) {
       const ai = this.AIs.find((ai) => ai.name === current);
@@ -232,15 +233,17 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  renderTurnHud() {
+  async renderTurnHud() {
     const current = this.currentPlayer();
     const next = this.nextPlayer();
-    const gold = this.playerGold["Player 1"];
+    await fetch(`/get_gold?player=${encodeURIComponent("Player 1")}`).then(res => res.json()).then(data => {
+      this.playerGold = data.gold;
+    });
 
     this.turnText.setText(
       `Round: ${this.round}\nCurrent: ${current}\nNext: ${next}`,
     );
-    this.goldText.setText(`Gold: ${gold}`);
+    this.goldText.setText(`Gold: ${this.playerGold}`);
   }
 
   async loadUnitDataFromDB() {
