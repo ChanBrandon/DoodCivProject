@@ -39,8 +39,8 @@ export class GameScene extends Phaser.Scene {
     this.load.json("level2", "assets/levels/level2.json");
     this.load.json("level3", "assets/levels/level3.json");
 
-    this.load.image("scout", "asset/scout.png");
-    this.load.image("warrior", "asset/warrior.png");
+    this.load.image("scout", "assets/scout.png");
+    this.load.image("warrior", "assets/warrior.png");
     this.load.image("knight", "assets/knight.png");
     this.load.image("lancer", "assets/lancer.png");
     this.load.image("slinger", "assets/slinger.png");
@@ -76,19 +76,19 @@ export class GameScene extends Phaser.Scene {
     // Tiers are easy to tweak; icons use your existing PNGs in /assets
     const units = [
       // Tier 1
-      { id: "warrior",   name: "Warrior",   tier: 1, iconKey: "warrior" },
-      { id: "slinger",   name: "Slinger",   tier: 1, iconKey: "slinger" },
-      { id: "scout",     name: "Scout",     tier: 1, iconKey: "scout"   },
+      { id: "warrior", name: "Warrior", tier: 1, iconKey: "warrior" },
+      { id: "slinger", name: "Slinger", tier: 1, iconKey: "slinger" },
+      { id: "scout", name: "Scout", tier: 1, iconKey: "scout" },
 
       // Tier 2
-      { id: "archer",    name: "Archer",    tier: 2, iconKey: "archer" },
+      { id: "archer", name: "Archer", tier: 2, iconKey: "archer" },
       { id: "swordsman", name: "Swordsman", tier: 2, iconKey: "swordsman" },
-      { id: "horseman",  name: "Horseman",  tier: 2, iconKey: "horseman" },
+      { id: "horseman", name: "Horseman", tier: 2, iconKey: "horseman" },
 
       // Tier 3
-      { id: "knight",    name: "Knight",    tier: 3, iconKey: "knight" },
-      { id: "chariot",   name: "Chariot",   tier: 3, iconKey: "chariot" },
-      { id: "lancer",    name: "Lancer",    tier: 3, iconKey: "lancer" },
+      { id: "knight", name: "Knight", tier: 3, iconKey: "knight" },
+      { id: "chariot", name: "Chariot", tier: 3, iconKey: "chariot" },
+      { id: "lancer", name: "Lancer", tier: 3, iconKey: "lancer" },
 
       // Tier 4
       { id: "musketeer", name: "Musketeer", tier: 4, iconKey: "musketeer" },
@@ -223,7 +223,9 @@ export class GameScene extends Phaser.Scene {
     const current = this.currentPlayer();
 
     this.units.forEach((unit) => {
-      if (unit.owner === current) unit.moved = false;
+      if (unit.owner === current) {
+        unit.incrementTurn();
+      }
     });
 
     const ownedTileCount = Array.from(this.tiles.values()).filter(
@@ -234,8 +236,8 @@ export class GameScene extends Phaser.Scene {
     await fetch("http://localhost:3000/set_gold", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: current, gold: this.playerGold })
-    })
+      body: JSON.stringify({ name: current, gold: this.playerGold }),
+    });
 
     if (current.startsWith("AI")) {
       const ai = this.AIs.find((ai) => ai.name === current);
@@ -286,9 +288,11 @@ export class GameScene extends Phaser.Scene {
   async renderTurnHud() {
     const current = this.currentPlayer();
     const next = this.nextPlayer();
-    await fetch(`/get_gold?player=${encodeURIComponent("Player 1")}`).then(res => res.json()).then(data => {
-      this.playerGold = data.gold;
-    });
+    await fetch(`/get_gold?player=${encodeURIComponent("Player 1")}`)
+      .then((res) => res.json())
+      .then((data) => {
+        this.playerGold = data.gold;
+      });
 
     this.turnText.setText(
       `Round: ${this.round}\nCurrent: ${current}\nNext: ${next}`,
@@ -301,6 +305,7 @@ export class GameScene extends Phaser.Scene {
       const res = await fetch(`/get_all_units`);
       const unitsData = await res.json();
 
+      /* 
       for (let unitData of unitsData) {
         const unit = new this.Unit(
           this,
@@ -319,6 +324,7 @@ export class GameScene extends Phaser.Scene {
         }
         this.units.push(unit);
       }
+      */
     } catch (error) {
       console.error("Error loading units from Database:", error);
     }
