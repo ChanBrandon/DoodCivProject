@@ -4,10 +4,17 @@ export class LevelSelect extends Phaser.Scene {
   }
 
   preload() {
-
   }
 
   create() {
+    if (!document.getElementById("mapFileInput")) {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".json";
+      input.style.display = "none";
+      input.id = "mapFileInput";
+      document.body.appendChild(input);
+    }
     this.menu = this.add.group();
 
     const centerX = this.scale.width / 2;
@@ -40,6 +47,24 @@ export class LevelSelect extends Phaser.Scene {
       align: "center",
     });
 
+    let loadMapBtn = this.add.text(-500, centerY + 75, "Load a Map", {
+      fontFamily: '"JetBrains Mono", monospace',
+      fontSize: "32px",
+      color: "#ffffff",
+      backgroundColor: "#333333",
+      padding: { x: 20, y: 10 },
+      align: "center",
+    });
+    
+    let viewMapsBtn = this.add.text(-500, centerY + 150, "View Uploaded Maps", {
+      fontFamily: '"JetBrains Mono", monospace',
+      fontSize: "32px",
+      color: "#ffffff",
+      backgroundColor: "#333333",
+      padding: { x: 20, y: 10 },
+      align: "center",
+    });
+    
     let backButton = this.add.text(-500, this.scale.height - 50, "Back", {
       fontFamily: '"JetBrains Mono", monospace',
       fontSize: "32px",
@@ -52,12 +77,16 @@ export class LevelSelect extends Phaser.Scene {
     level1.setOrigin(0.5);
     level2.setOrigin(0.5);
     level3.setOrigin(0.5);
+    loadMapBtn.setOrigin(0.5);
+    viewMapsBtn.setOrigin(0.5);
     backButton.setOrigin(0.5);
 
     this.menu.add(level1);
     this.menu.add(level2);
     this.menu.add(level3);
     this.menu.add(backButton);
+    this.menu.add(loadMapBtn);
+    this.menu.add(viewMapsBtn);
 
     this.tweens.add({
       targets: level1,
@@ -89,6 +118,22 @@ export class LevelSelect extends Phaser.Scene {
       ease: "Sine.easeOut",
       duration: 1000,
       delay: 800,
+    });
+
+    this.tweens.add({
+      targets: loadMapBtn,
+      x: centerX,
+      ease: "Sine.easeOut",
+      duration: 1000,
+      delay: 800,
+    });
+    
+    this.tweens.add({
+      targets: viewMapsBtn,
+      x: centerX,
+      ease: "Sine.easeOut",
+      duration: 1000,
+      delay: 1000,
     });
 
     level1.setInteractive({ useHandCursor: true });
@@ -150,6 +195,96 @@ export class LevelSelect extends Phaser.Scene {
       console.log("Back button clicked");
       // Switch scenes here
       this.scene.start("menu");
+    });
+
+    loadMapBtn.setInteractive({ useHandCursor: true });
+    loadMapBtn.on("pointerdown", () => {
+      document.getElementById("mapFileInput").click();
+    });
+    
+    document.getElementById("mapFileInput").addEventListener("change", async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+    
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const mapJson = JSON.parse(e.target.result);
+    
+        const levelName = prompt("Enter a name for this level:");
+        if (!levelName) return;
+    
+        // Save to localStorage
+        const existingMaps = JSON.parse(localStorage.getItem("customMaps") || "{}");
+        existingMaps[levelName] = mapJson;
+        localStorage.setItem("customMaps", JSON.stringify(existingMaps));
+    
+        alert(`Map "${levelName}" loaded! You can now view it from 'View Uploaded Maps'.`);
+      };
+      reader.readAsText(file);
+    
+      // Reset input value to allow re-upload of same file
+      event.target.value = "";
+    });
+
+    viewMapsBtn.setInteractive({ useHandCursor: true });
+    viewMapsBtn.on("pointerdown", () => {
+      if (this.mapButtons) {
+        this.mapButtons.forEach(btn => btn.destroy());
+      }
+
+      this.mapButtons = [];
+      const maps = JSON.parse(localStorage.getItem("customMaps") || "{}");
+    
+      if (Object.keys(maps).length === 0) {
+        alert("No uploaded maps found.");
+        return;
+      }
+    
+      const centerX = this.cameras.main.centerX;
+      const centerY = this.cameras.main.centerY;
+    
+      Object.keys(maps).forEach((mapName, i) => {
+        const btn = this.add.text(centerX - 100, centerY + 200 + i * 50, mapName, {
+          fontFamily: '"JetBrains Mono", monospace',
+          fontSize: "20px",
+          color: "#ffffff",
+          backgroundColor: "#444",
+          padding: { x: 10, y: 6 },
+        })
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true });
+    
+        btn.on("pointerdown", () => {
+          this.cache.json.add(mapName, maps[mapName]);
+          this.scene.start("game", { level: mapName });
+        });
+    
+        const delBtn = this.add.text(centerX + 100, centerY + 200 + i * 50, "🗑️", {
+          fontFamily: '"JetBrains Mono", monospace',
+          fontSize: "20px",
+          color: "#ff5555",
+          backgroundColor: "#222",
+          padding: { x: 8, y: 6 },
+        })
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true });
+    
+        delBtn.on("pointerdown", () => {
+          const confirmDelete = confirm(`Delete map "${mapName}"?`);
+          if (!confirmDelete) return;
+    
+          // Remove from localStorage
+          const updatedMaps = JSON.parse(localStorage.getItem("customMaps") || "{}");
+          delete updatedMaps[mapName];
+          localStorage.setItem("customMaps", JSON.stringify(updatedMaps));
+    
+          this.mapButtons.forEach(btn => btn.destroy());
+          this.mapButtons = [];
+          viewMapsBtn.emit("pointerdown");
+        });
+    
+        this.mapButtons.push(btn, delBtn);
+      });
     });
   }
 }

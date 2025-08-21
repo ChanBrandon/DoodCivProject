@@ -203,7 +203,7 @@ export class Menu extends Phaser.Scene {
 
     createMapButton.on("pointerdown", () => {
       console.log("Create Map button clicked");
-      // Switch scenes here
+      this.scene.start("map_creator")
     });
   }
 }
