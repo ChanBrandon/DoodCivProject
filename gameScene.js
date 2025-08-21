@@ -196,6 +196,8 @@ export class GameScene extends Phaser.Scene {
         }
       });
     });
+
+    this.createBackButton();
   }
 
   createUnitTray() {
@@ -251,6 +253,34 @@ export class GameScene extends Phaser.Scene {
     this.renderTurnHud();
   }
 
+  createBackButton() {
+    const backBtn = this.add.text(this.scale.width - 80, this.scale.height - 40, "← Back", {
+      fontFamily: '"JetBrains Mono", monospace',
+      fontSize: "18px",
+      color: "#ffffff",
+      backgroundColor: "#444444",
+      padding: { x: 12, y: 6 },
+    })
+    .setOrigin(0.5)
+    .setInteractive({ useHandCursor: true });
+
+    backBtn.on("pointerdown", () => {
+      // Clean up units and UI
+      this.units.forEach(unit => unit.sprite?.destroy());
+      this.units = [];
+
+      this.unitUI?.destroy();
+
+      // Return to Level Select
+      this.scene.start("level_select");
+    });
+
+    // Keep it responsive on resize
+    this.scale.on("resize", (size) => {
+      backBtn.setPosition(80, size.height - 40);
+    });
+  }
+  
   createTurnHud() {
     const x = this.scale.width - 260;
 
