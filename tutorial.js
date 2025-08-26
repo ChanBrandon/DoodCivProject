@@ -30,8 +30,7 @@ export class Tutorial extends Phaser.Scene {
     const htMove = this.add.image(rightX, centerY - 20, "htMove").setScale(0.3);
     const htUIImg = this.add.image(rightX, centerY + 220, "htUI").setScale(0.35);
 
-
-    // Instruction text (you can expand this with multiple pages if you want)
+    // Instruction text
     let instructions = this.add.text(leftX + 100, centerY, 
       "Goal:\n" + 
       "Color the entire map in your own team color\n\n" +
@@ -76,7 +75,6 @@ export class Tutorial extends Phaser.Scene {
       delay: 100,
     });
 
-    // Hover effects
     backBtn.setInteractive({ useHandCursor: true });
 
     backBtn.on("pointerover", () => backBtn.setStyle({ fill: "#ff0" }));

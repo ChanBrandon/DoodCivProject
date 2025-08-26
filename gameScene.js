@@ -332,7 +332,9 @@ export class GameScene extends Phaser.Scene {
   showEndScreen(result) {
 
     this.input.keyboard.removeAllListeners(); 
-
+    this.unitUI?.destroy();
+    this.unitTray?.destroy();
+    
     const overlay = this.add.rectangle(
       this.scale.width / 2,
       this.scale.height / 2,
