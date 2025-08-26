@@ -191,6 +191,7 @@ export class Menu extends Phaser.Scene {
     tutorialButton.on("pointerdown", () => {
       console.log("Tutorial button clicked");
       // Switch scenes here
+      this.scene.start("tutorial");
     });
 
     createMapButton.on("pointerover", () => {
@@ -203,7 +204,7 @@ export class Menu extends Phaser.Scene {
 
     createMapButton.on("pointerdown", () => {
       console.log("Create Map button clicked");
-      this.scene.start("map_creator")
+      this.scene.start("map_creator");
     });
   }
 }
