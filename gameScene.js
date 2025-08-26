@@ -221,6 +221,19 @@ export class GameScene extends Phaser.Scene {
     return this.players[(this.turnIndex + 1) % this.players.length];
   }
 
+  checkWinLose() {
+    const allTiles = Array.from(this.tiles.values());
+
+    const allPlayer = allTiles.every(tile => tile.owner === "Player 1");
+    const allEnemy  = allTiles.every(tile => tile.owner && tile.owner.startsWith("AI"));
+
+    if (allPlayer) {
+      this.showEndScreen("win");
+    } else if (allEnemy) {
+      this.showEndScreen("lose");
+    }
+  }
+
   async advanceTurn() {
     const current = this.currentPlayer();
 
@@ -253,6 +266,7 @@ export class GameScene extends Phaser.Scene {
     if (this.turnIndex === 0) this.round += 1;
 
     this.renderTurnHud();
+    this.checkWinLose();
   }
 
   createBackButton() {
@@ -314,6 +328,49 @@ export class GameScene extends Phaser.Scene {
       padding: { x: 12, y: 8 },
     });
   }
+
+  showEndScreen(result) {
+
+    this.input.keyboard.removeAllListeners(); 
+
+    const overlay = this.add.rectangle(
+      this.scale.width / 2,
+      this.scale.height / 2,
+      this.scale.width,
+      this.scale.height,
+      0x000000,
+      0.6
+    );
+    overlay.setDepth(100);
+
+    const text = this.add.text(
+      this.scale.width / 2,
+      this.scale.height / 2 - 50,
+      result === "win" ? "YOU WIN!" : "YOU LOSE!",
+      {
+        fontSize: "64px",
+        fontStyle: "bold",
+        color: result === "win" ? "#00ff00" : "#ff0000"
+      }
+    ).setOrigin(0.5).setDepth(101);
+
+    const button = this.add.text(
+      this.scale.width / 2,
+      this.scale.height / 2 + 50,
+      "Back to Level Select",
+      {
+        fontSize: "32px",
+        color: "#ffffff",
+        backgroundColor: "#333333",
+        padding: { x: 20, y: 10 }
+      }
+    ).setOrigin(0.5).setInteractive().setDepth(101);
+
+    button.on("pointerdown", () => {
+      this.scene.start("level_select");
+    });
+  }
+
 
   async renderTurnHud() {
     const current = this.currentPlayer();
