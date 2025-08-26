@@ -144,6 +144,7 @@ export default class UnitProgression {
         u.iconKey, // texture
         "Player 1",
         Unit,
+        u.id
       );
 
       const label = this.scene.add.text(
