@@ -1,4 +1,4 @@
-class TurnManager {
+class turnManager {
   constructor(players) {
     this.players = players;
     this.currentIndex = 0;

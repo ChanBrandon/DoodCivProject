@@ -1,7 +1,11 @@
 // UnitProgression.js
 // Lightweight unit list + 5-round tier progression HUD for Phaser 3.
+//
 
-export default class UnitProgression {
+import UnitTray from "./lib/unitTray.js";
+import Unit from "./lib/unit.js";
+
+export default class unitProgression {
   /**
    * @param {Phaser.Scene} scene
    * @param {Object} opts
@@ -12,16 +16,21 @@ export default class UnitProgression {
    */
   constructor(scene, opts = {}) {
     this.scene = scene;
-    this.units = (opts.units || []).slice().sort((a,b)=>a.tier-b.tier||a.name.localeCompare(b.name));
+    this.units = (opts.units || [])
+      .slice()
+      .sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name));
     this.turnsPerTier = opts.turnsPerTier ?? 5;
     this.panelWidth = opts.panelWidth ?? 260;
     this.onTierUnlock = opts.onTierUnlock;
+
+    this.ownerIndex = opts.ownerIndex ?? 0; // pass in who owns this tray list
+    this.UnitClass = opts.UnitClass ?? null; // pass in the unit class to spawn
 
     this.unlockedTier = 1;
     this.bg = null;
     this.title = null;
     this.list = null;
-    this.rows = []; // {unit, container, icon, label, lockOverlay}
+    this.rows = []; // {unit, container, tray, label, lockOverlay}
 
     this._onResize = this._onResize.bind(this);
     this._onTurnChanged = this._onTurnChanged.bind(this);
@@ -29,7 +38,6 @@ export default class UnitProgression {
     this._buildUI();
     this.applyRound(this._currentRound());
 
-    // listen for global TurnManager events if present
     if (this.scene.game?.events) {
       this.scene.game.events.on("turn:changed", this._onTurnChanged);
     }
@@ -38,9 +46,21 @@ export default class UnitProgression {
 
   // --- public API ------------------------------------------------------------
 
+  updateTrayAffordability(playerGold) {
+    for (const row of this.rows) {
+      // skip locked tiers
+      if (row.unit.tier > this.unlockedTier) continue;
+
+      if (row.tray.cost != null) {
+        const canAfford = playerGold >= row.tray.cost;
+        row.tray.setAffordable(canAfford);
+      }
+    }
+  }
   /** Call when your round changes (if you don’t emit turn:changed). */
   applyRound(round) {
-    const newTier = Math.floor((Math.max(1, round) - 1) / this.turnsPerTier) + 1;
+    const newTier =
+      Math.floor((Math.max(1, round) - 1) / this.turnsPerTier) + 1;
     if (newTier !== this.unlockedTier) {
       this.unlockedTier = newTier;
       if (this.onTierUnlock) this.onTierUnlock(this.unlockedTier);
@@ -50,7 +70,9 @@ export default class UnitProgression {
 
   /** Replace unit list at runtime (optional). */
   setUnits(units) {
-    this.units = (units || []).slice().sort((a,b)=>a.tier-b.tier||a.name.localeCompare(b.name));
+    this.units = (units || [])
+      .slice()
+      .sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name));
     this._rebuildRows();
     this._renderLocks();
   }
@@ -59,40 +81,42 @@ export default class UnitProgression {
   destroy() {
     this.scene.scale.off("resize", this._onResize);
     this.scene.game?.events?.off("turn:changed", this._onTurnChanged);
-    [this.bg, this.title, this.list, ...this.rows.map(r=>r.container)].forEach(o=>o?.destroy());
+    [
+      this.bg,
+      this.title,
+      this.list,
+      ...this.rows.map((r) => r.container),
+    ].forEach((o) => o?.destroy());
     this.rows = [];
   }
 
   // --- internals -------------------------------------------------------------
 
   _currentRound() {
-    if (this.scene.game?.turnManager?.round) return this.scene.game.turnManager.round;
+    if (this.scene.game?.turnManager?.round)
+      return this.scene.game.turnManager.round;
     if (typeof this.scene.round === "number") return this.scene.round;
-    return 1;
   }
 
-  _onTurnChanged(payload) {
-    const round = payload?.round ?? this._currentRound();
-    this.applyRound(round);
-  }
+    this.bg = this.scene.add
+      .rectangle(0, 0, this.panelWidth, height, 0x111522, 0.85)
+      .setOrigin(0, 0)
+      .setDepth(1000)
+      .setScrollFactor(0);
 
-  _onResize(size) {
-    this._layout(size.width, size.height);
-  }
+    this.title = this.scene.add
+      .text(16, 10, "Units", {
+        fontFamily: '"JetBrains Mono", monospace',
+        fontSize: "20px",
+        color: "#ffffff",
+      })
+      .setDepth(1001)
+      .setScrollFactor(0);
 
-  _buildUI() {
-    const { width, height } = this.scene.scale;
-
-    this.bg = this.scene.add.rectangle(0, 0, this.panelWidth, height, 0x111522, 0.85)
-      .setOrigin(0, 0).setDepth(1000).setScrollFactor(0);
-
-    this.title = this.scene.add.text(16, 10, "Units", {
-      fontFamily: '"JetBrains Mono", monospace',
-      fontSize: "20px",
-      color: "#ffffff",
-    }).setDepth(1001).setScrollFactor(0);
-
-    this.list = this.scene.add.container(0, 40).setDepth(1001).setScrollFactor(0);
+    this.list = this.scene.add
+      .container(0, 40)
+      .setDepth(1001)
+      .setScrollFactor(0);
 
     this._rebuildRows();
     this._layout(width, height);
@@ -101,36 +125,33 @@ export default class UnitProgression {
   _rebuildRows() {
     this.list.removeAll(true);
     this.rows = [];
+      );
 
-    const pad = 12, rowH = 48, left = 16;
-    let y = pad;
+      const label = this.scene.add.text(
+        left + 48,
+        12,
+        `${u.name}  (T${u.tier})`,
+        {
+          fontFamily: '"JetBrains Mono", monospace',
+          fontSize: "16px",
+          color: "#ffffff",
+        },
+      );
 
-    for (const u of this.units) {
-      const row = this.scene.add.container(0, y);
+      const lockOverlay = this.scene.add
+        .rectangle(0, 0, this.panelWidth, rowH, 0x000000, 0.45)
+        .setOrigin(0, 0)
+        .setVisible(false);
 
-      let icon;
-      if (u.iconKey && this.scene.textures.exists(u.iconKey)) {
-        icon = this.scene.add.image(left + 20, 0, u.iconKey).setOrigin(0.5, 0).setDisplaySize(36, 36);
-      } else {
-        icon = this.scene.add.circle(left + 20, 18, 18, 0x888888).setOrigin(0.5);
-      }
+      const underline = this.scene.add
+        .rectangle(0, rowH - 1, this.panelWidth, 1, 0x2a2f41)
+        .setOrigin(0, 1);
 
-      const label = this.scene.add.text(left + 48, 4, `${u.name}  (T${u.tier})`, {
-        fontFamily: '"JetBrains Mono", monospace',
-        fontSize: "16px",
-        color: "#ffffff",
-      });
-
-      const lockOverlay = this.scene.add.rectangle(0, 0, this.panelWidth, rowH, 0x000000, 0.45)
-        .setOrigin(0, 0).setVisible(false);
-
-      const underline = this.scene.add.rectangle(0, rowH - 1, this.panelWidth, 1, 0x2a2f41).setOrigin(0, 1);
-
-      row.add([icon, label, lockOverlay, underline]);
+      row.add([tray.sprite, label, lockOverlay, underline]);
       row.setPosition(0, y);
       this.list.add(row);
 
-      this.rows.push({ unit: u, container: row, icon, label, lockOverlay });
+      this.rows.push({ unit: u, container: row, tray, label, lockOverlay });
       y += rowH;
     }
   }
@@ -145,8 +166,41 @@ export default class UnitProgression {
     for (const row of this.rows) {
       const locked = row.unit.tier > this.unlockedTier;
       row.lockOverlay.setVisible(locked);
-      row.icon.setAlpha(locked ? 0.35 : 1);
+      row.tray.sprite.disableInteractive(); // default
+      if (!locked) {
+        row.tray.sprite.setInteractive({ useHandCursor: true });
+      }
+      row.tray.sprite.setAlpha(locked ? 0.35 : 1);
       row.label.setAlpha(locked ? 0.6 : 1);
     }
   }
-}
+}        "Player 1",
+        Unit,
+        u.id,
+        36,
+        30, // offset so it sits in row
+        u.iconKey, // texture
+
+      const tray = new UnitTray(
+        this.scene,
+    const pad = 12,
+      rowH = 60,
+      //
+      left = 16;
+    let y = pad;
+
+
+    for (const u of this.units) {
+      const row = this.scene.add.container(0, y);
+
+  _buildUI() {
+    const { width, height } = this.scene.scale;
+    return 1;
+  _onResize(size) {
+    this._layout(size.width, size.height);
+  }
+
+
+  _onTurnChanged(payload) {
+    const round = payload?.round ?? this._currentRound();
+    this.applyRound(round);
