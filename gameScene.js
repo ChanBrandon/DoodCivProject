@@ -28,10 +28,27 @@ export class GameScene extends Phaser.Scene {
     // combat
     this.selectedUnit = null;
     this.targetUnit = null;
+    this._playerGold = 100;
   }
 
   init(data) {
     this.level = data.level;
+  }
+
+  get playerGold() {
+    return this._playerGold;
+  }
+
+  set playerGold(value) {
+    this._playerGold = value;
+
+    if (this.goldText) {
+      this.goldText.setText(`Gold: ${this._playerGold}`);
+    }
+
+    if (this.unitUI) {
+      this.unitUI.updateTrayAffordability(this._playerGold);
+    }
   }
 
   preload() {
@@ -153,8 +170,6 @@ export class GameScene extends Phaser.Scene {
 
     this.input.setTopOnly(true);
 
-    this.createUnitTray();
-
     // HUD
     this.createTurnHud();
     this.renderTurnHud();
@@ -200,10 +215,6 @@ export class GameScene extends Phaser.Scene {
     this.createBackButton();
   }
 
-  createUnitTray() {
-    new UnitTray(this, 80, 80, "knight", "Player 1", Unit);
-  }
-
   shutdown() {
     this.unitUI?.destroy();
   }
@@ -224,8 +235,10 @@ export class GameScene extends Phaser.Scene {
   checkWinLose() {
     const allTiles = Array.from(this.tiles.values());
 
-    const allPlayer = allTiles.every(tile => tile.owner === "Player 1");
-    const allEnemy  = allTiles.every(tile => tile.owner && tile.owner.startsWith("AI"));
+    const allPlayer = allTiles.every((tile) => tile.owner === "Player 1");
+    const allEnemy = allTiles.every(
+      (tile) => tile.owner && tile.owner.startsWith("AI"),
+    );
 
     if (allPlayer) {
       this.showEndScreen("win");
@@ -237,52 +250,53 @@ export class GameScene extends Phaser.Scene {
   async advanceTurn() {
     const current = this.currentPlayer();
 
-    this.units.forEach((unit) => {
-      if (unit.owner === current) {
-        unit.incrementTurn();
-      }
-    });
+    if (current === "Player 1") {
+      this.units.forEach((unit) => {
+        if (unit.owner === current) unit.incrementTurn();
+      });
 
-    const ownedTileCount = Array.from(this.tiles.values()).filter(
-      (tile) => tile.owner === current,
-    ).length;
-    const goldGained = ownedTileCount * 5;
-    this.playerGold += goldGained;
-    await fetch("http://localhost:3000/set_gold", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: current, gold: this.playerGold }),
-    });
+      const ownedTileCount = Array.from(this.tiles.values()).filter(
+        (tile) => tile.owner === current,
+      ).length;
+      const goldGained = ownedTileCount * 5;
+      this.playerGold += goldGained;
 
-    if (current.startsWith("AI")) {
-      const ai = this.AIs.find((ai) => ai.name === current);
-      if (ai) {
+      await fetch("http://localhost:3000/set_gold", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: current, gold: this.playerGold }),
+      });
+
+      for (const ai of this.AIs) {
         ai.newTurn();
         ai.takeTurn();
       }
+
+      this.round += 1;
+      this.turnIndex = 0;
     }
 
-    this.turnIndex = (this.turnIndex + 1) % this.players.length;
-    if (this.turnIndex === 0) this.round += 1;
+    this.game.events.emit("turn:changed", { round: this.round });
 
     this.renderTurnHud();
     this.checkWinLose();
   }
 
   createBackButton() {
-    const backBtn = this.add.text(this.scale.width - 80, this.scale.height - 40, "← Back", {
-      fontFamily: '"JetBrains Mono", monospace',
-      fontSize: "18px",
-      color: "#ffffff",
-      backgroundColor: "#444444",
-      padding: { x: 12, y: 6 },
-    })
-    .setOrigin(0.5)
-    .setInteractive({ useHandCursor: true });
+    const backBtn = this.add
+      .text(this.scale.width - 80, this.scale.height - 40, "← Back", {
+        fontFamily: '"JetBrains Mono", monospace',
+        fontSize: "18px",
+        color: "#ffffff",
+        backgroundColor: "#444444",
+        padding: { x: 12, y: 6 },
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
 
     backBtn.on("pointerdown", () => {
       // Clean up units and UI
-      this.units.forEach(unit => unit.sprite?.destroy());
+      this.units.forEach((unit) => unit.sprite?.destroy());
       this.units = [];
 
       this.unitUI?.destroy();
@@ -296,7 +310,7 @@ export class GameScene extends Phaser.Scene {
       backBtn.setPosition(80, size.height - 40);
     });
   }
-  
+
   createTurnHud() {
     const x = this.scale.width - 260;
 
@@ -330,49 +344,54 @@ export class GameScene extends Phaser.Scene {
   }
 
   showEndScreen(result) {
-
-    this.input.keyboard.removeAllListeners(); 
+    this.input.keyboard.removeAllListeners();
     this.unitUI?.destroy();
     this.unitTray?.destroy();
-    
+
     const overlay = this.add.rectangle(
       this.scale.width / 2,
       this.scale.height / 2,
       this.scale.width,
       this.scale.height,
       0x000000,
-      0.6
+      0.6,
     );
     overlay.setDepth(100);
 
-    const text = this.add.text(
-      this.scale.width / 2,
-      this.scale.height / 2 - 50,
-      result === "win" ? "YOU WIN!" : "YOU LOSE!",
-      {
-        fontSize: "64px",
-        fontStyle: "bold",
-        color: result === "win" ? "#00ff00" : "#ff0000"
-      }
-    ).setOrigin(0.5).setDepth(101);
+    const text = this.add
+      .text(
+        this.scale.width / 2,
+        this.scale.height / 2 - 50,
+        result === "win" ? "YOU WIN!" : "YOU LOSE!",
+        {
+          fontSize: "64px",
+          fontStyle: "bold",
+          color: result === "win" ? "#00ff00" : "#ff0000",
+        },
+      )
+      .setOrigin(0.5)
+      .setDepth(101);
 
-    const button = this.add.text(
-      this.scale.width / 2,
-      this.scale.height / 2 + 50,
-      "Back to Level Select",
-      {
-        fontSize: "32px",
-        color: "#ffffff",
-        backgroundColor: "#333333",
-        padding: { x: 20, y: 10 }
-      }
-    ).setOrigin(0.5).setInteractive().setDepth(101);
+    const button = this.add
+      .text(
+        this.scale.width / 2,
+        this.scale.height / 2 + 50,
+        "Back to Level Select",
+        {
+          fontSize: "32px",
+          color: "#ffffff",
+          backgroundColor: "#333333",
+          padding: { x: 20, y: 10 },
+        },
+      )
+      .setOrigin(0.5)
+      .setInteractive()
+      .setDepth(101);
 
     button.on("pointerdown", () => {
       this.scene.start("level_select");
     });
   }
-
 
   async renderTurnHud() {
     const current = this.currentPlayer();
@@ -386,7 +405,7 @@ export class GameScene extends Phaser.Scene {
     this.turnText.setText(
       `Round: ${this.round}\nCurrent: ${current}\nNext: ${next}`,
     );
-    this.goldText.setText(`Gold: ${this.playerGold}`);
+    // this.goldText.setText(`Gold: ${this.playerGold}`);
   }
 
   async loadUnitDataFromDB() {

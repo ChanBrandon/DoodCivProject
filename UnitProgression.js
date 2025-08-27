@@ -46,6 +46,17 @@ export default class UnitProgression {
 
   // --- public API ------------------------------------------------------------
 
+  updateTrayAffordability(playerGold) {
+    for (const row of this.rows) {
+      // skip locked tiers
+      if (row.unit.tier > this.unlockedTier) continue;
+
+      if (row.tray.cost != null) {
+        const canAfford = playerGold >= row.tray.cost;
+        row.tray.setAffordable(canAfford);
+      }
+    }
+  }
   /** Call when your round changes (if you don’t emit turn:changed). */
   applyRound(round) {
     const newTier =
@@ -144,7 +155,7 @@ export default class UnitProgression {
         u.iconKey, // texture
         "Player 1",
         Unit,
-        u.id
+        u.id,
       );
 
       const label = this.scene.add.text(
