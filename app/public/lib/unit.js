@@ -14,7 +14,7 @@ export default class Unit {
     // this.sprite.unitId = this.id; // sprite attaches to unit id
     //this.id = null;
 
-    const tile = scene.tiles.get('${q},${r}');
+    const tile = scene.tiles.get(`${q},${r}`);
     if (!tile) {
       throw new Error('Tile not found at q:${q}, r:${r} when spawning unit');
     }
