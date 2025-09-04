@@ -754,6 +754,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ===== Supabase persistence for round/tiles =====
+  /*
   saveTurnState(level) {
     return supabase
       .from("turn_state")
@@ -831,5 +832,85 @@ export class GameScene extends Phaser.Scene {
       tile.setOwner(row.owner || null);
     }
     console.log("Tiles loaded.");
+  }
+  */
+
+  saveTable(level, table) {
+    fetch("/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        level,
+        table,
+        data: this.extractTableData(table),
+      }),
+    });
+  }
+
+  saveTurnState(level) {
+    fetch("/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        level,
+        table: "turn_state",
+        data: { turn: this.turnIndex, round: this.round },
+      }),
+    });
+  }
+
+  saveTiles(level) {
+    const tilesData = Array.from(this.tiles.values()).map((tile) => ({
+      q: tile.q,
+      r: tile.r,
+      color: tile.baseColor,
+      owner: tile.owner || null,
+    }));
+    fetch("/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ level, table: "tiles", data: tilesData }),
+    });
+  }
+
+  async importTable(level, table) {
+    const res = await fetch(`/load?level=${level}&table=${table}`);
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error);
+
+    // Clear and reinsert table data into DB
+    await fetch(`/clear_table?name=${table}`, { method: "POST" });
+    for (let row of data.data) {
+      await fetch(`/insert_row?table=${table}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(row),
+      });
+    }
+  }
+
+  async loadTurnState(level) {
+    const res = await fetch(`/load?level=${level}&table=turn_state`);
+    const data = await res.json();
+    if (data.success) {
+      this.turnIndex = data.data.turn;
+      this.round = data.data.round;
+      this.renderTurnHud();
+    }
+  }
+
+  async loadTiles(level) {
+    const res = await fetch(`/load?level=${level}&table=tiles`);
+    const data = await res.json();
+    if (data.success) {
+      for (const tileData of data.data) {
+        const key = `${tileData.q},${tileData.r}`;
+        const tile = this.tiles.get(key);
+        if (tile) {
+          tile.setColor(parseInt(tileData.color));
+          tile.setOwner(tileData.owner || null);
+        }
+      }
+    }
   }
 }
