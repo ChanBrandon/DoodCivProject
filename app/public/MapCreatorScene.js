@@ -82,7 +82,7 @@ export class MapCreatorScene extends Phaser.Scene {
       { label: "Player", color: 0x3377cc },
       { label: "Enemy", color: 0xd2042d },
       { label: "Remove", color: null },
-      { label: "Restore", color: "restore" },
+      { label: "Add", color: "restore" },
     ];
   
     palette.forEach((entry, i) => {
