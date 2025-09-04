@@ -146,7 +146,6 @@ export default class Unit {
         if (this.boundTile) this.boundTile.unit = null;
         this.resetPosition();
         this.moveToTile(tile);
-        console.log("ID: " + this.id_num);
         await fetch(`http://localhost:3000/update_unit_pos?id=${this.id_num}&r_pos=${this.r}&q_pos=${this.q}`); // Update unit position in units_state
         this.movesLeft--;
         //this.moved = true;

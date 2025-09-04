@@ -314,13 +314,6 @@ app.put("/set_moves_left", async (req, res) => {
   }
 });
 
-app.get("/get_unit_id", async (req, res) => {
-  const r_pos = req.query.r_pos;
-  const q_pos = req.query.q_pos;
-  const unit = await pool.query(`SELECT id FROM units_state WHERE r_pos = $1 AND q_pos = $2`, [r_pos, q_pos]);
-  return res.json(unit.rows[0]);
-})
-
 app.listen(port, hostname, () => {
   console.log(`Listening at: http://${hostname}:${port}`);
 });
